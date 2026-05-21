@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\CondoNotificationCreated;
 use App\Events\DepartmentMessageSent;
+use App\Models\CondoNotification;
 use App\Models\Mensaje;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -49,6 +51,16 @@ class ChatMessageController extends Controller
         $mensaje = Mensaje::create($data);
 
         event(new DepartmentMessageSent($mensaje));
+
+        $notification = CondoNotification::create([
+            'departamento' => $mensaje->departamento,
+            'tipo' => 'mensaje',
+            'titulo' => 'Nuevo mensaje en chat',
+            'detalle' => $mensaje->remitente.': '.$mensaje->mensaje,
+            'leida' => false,
+        ]);
+
+        event(new CondoNotificationCreated($notification));
 
         return response()->json([
             'data' => [
