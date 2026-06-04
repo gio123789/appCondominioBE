@@ -8,6 +8,7 @@ use App\Models\CondoNotification;
 use App\Models\Mensaje;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Throwable;
 
 class ChatMessageController extends Controller
 {
@@ -52,15 +53,19 @@ class ChatMessageController extends Controller
 
         event(new DepartmentMessageSent($mensaje));
 
-        $notification = CondoNotification::create([
-            'departamento' => $mensaje->departamento,
-            'tipo' => 'mensaje',
-            'titulo' => 'Nuevo mensaje en chat',
-            'detalle' => $mensaje->remitente.': '.$mensaje->mensaje,
-            'leida' => false,
-        ]);
+        try {
+            $notification = CondoNotification::create([
+                'departamento' => $mensaje->departamento,
+                'tipo' => 'mensaje',
+                'titulo' => 'Nuevo mensaje en chat',
+                'detalle' => $mensaje->remitente.': '.$mensaje->mensaje,
+                'leida' => false,
+            ]);
 
-        event(new CondoNotificationCreated($notification));
+            event(new CondoNotificationCreated($notification));
+        } catch (Throwable $e) {
+            report($e);
+        }
 
         return response()->json([
             'data' => [
