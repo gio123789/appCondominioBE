@@ -6,6 +6,7 @@ use App\Events\CondoNotificationCreated;
 use App\Events\DepartmentMessageSent;
 use App\Models\CondoNotification;
 use App\Models\Mensaje;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Throwable;
@@ -15,16 +16,21 @@ class ChatMessageController extends Controller
     public function index(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'departamento' => ['required', 'integer', 'min:1'],
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
         ]);
 
+        /** @var User $user */
+        $user = $request->user();
+
         $limit = $data['limit'] ?? 50;
 
-        $mensajes = Mensaje::query()
-            ->where('departamento', $data['departamento'])
-            ->latest('id')
-            ->limit($limit)
+        $query = Mensaje::query()->latest('id')->limit($limit);
+
+        if ($user->role !== 'admin') {
+            $query->where('departamento', $user->departamento);
+        }
+
+        $mensajes = $query
             ->get()
             ->reverse()
             ->values()
@@ -44,12 +50,23 @@ class ChatMessageController extends Controller
     public function store(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'remitente' => ['required', 'string', 'max:80'],
-            'departamento' => ['required', 'integer', 'min:1'],
             'mensaje' => ['required', 'string', 'max:500'],
         ]);
 
-        $mensaje = Mensaje::create($data);
+        /** @var User $user */
+        $user = $request->user();
+
+        if (! $user->departamento) {
+            return response()->json([
+                'message' => 'El usuario no tiene departamento asignado.',
+            ], 422);
+        }
+
+        $mensaje = Mensaje::create([
+            'remitente' => $user->name,
+            'departamento' => $user->departamento,
+            'mensaje' => $data['mensaje'],
+        ]);
 
         event(new DepartmentMessageSent($mensaje));
 
